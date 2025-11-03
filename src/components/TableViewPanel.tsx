@@ -148,7 +148,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
       {/* Toolbar */}
       <div
         style={{
-          padding: '0 8px',
+          padding: '8px 8px 0 8px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -195,7 +195,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
         </Space>
 
         <div style={{ color: '#666', fontSize: '12px' }}>
-          Table: {tab.tableName} | Primary Key: {tab.primaryKey}
+          Primary Key: {tab.primaryKey}
         </div>
       </div>
 
