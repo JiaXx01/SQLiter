@@ -4,12 +4,21 @@ import { apiService } from '../services/api.service'
 import { TableOutlined, ColumnHeightOutlined } from '@ant-design/icons'
 import React from 'react'
 
+interface ColumnInfo {
+  name: string
+  type: string
+  notnull: number
+}
+
 interface SchemaStoreState {
   // Tree data for Ant Design Tree component
   treeData: TreeNodeData[]
 
   // Schema cache for autocomplete: { "tableName": ["col1", "col2", ...] }
   schemaMap: Map<string, string[]>
+
+  // Full column info cache: { "tableName": [{ name, type, notnull }, ...] }
+  columnInfoCache: Map<string, ColumnInfo[]>
 
   // Keys of nodes currently being loaded
   loadingKeys: Set<string>
@@ -45,6 +54,7 @@ function updateNodeInTree(
 export const useSchemaStore = create<SchemaStoreState>((set, get) => ({
   treeData: [],
   schemaMap: new Map(),
+  columnInfoCache: new Map(),
   loadingKeys: new Set(),
 
   /**
@@ -85,32 +95,64 @@ export const useSchemaStore = create<SchemaStoreState>((set, get) => ({
 
         set({ treeData: tableNodes })
 
-        // Preload all table columns for autocomplete
+        // Preload all table columns for autocomplete in a SINGLE batch request
+        // This optimizes from N requests (one per table) to just 1 request
         const newSchemaMap = new Map<string, string[]>()
-        for (const row of results[0].rows) {
+        const newColumnInfoCache = new Map<string, ColumnInfo[]>()
+        const tables = results[0].rows.map((row: any) => row.table_name)
+        
+        if (tables.length > 0) {
           try {
-            const tableName = row.table_name
-            // PRAGMA table_info requires single-quoted table name for reserved keywords
-            const columnSql = `PRAGMA table_info('${tableName.replace(
-              /'/g,
-              "''"
-            )}')`
-            const columnResults = await apiService.execute(columnSql)
+            // Build a UNION ALL query to fetch all table columns at once
+            // Each subquery returns: table_name, column_name, type, notnull_flag
+            const unionQueries = tables.map((tableName: string) => {
+              const escapedName = tableName.replace(/'/g, "''")
+              return `SELECT '${escapedName}' as table_name, name as column_name, type, "notnull" as notnull_flag FROM pragma_table_info('${escapedName}')`
+            })
+            
+            const batchSql = unionQueries.join(' UNION ALL ')
+            const columnResults = await apiService.execute(batchSql)
 
             if (columnResults[0]?.rows) {
-              newSchemaMap.set(
-                tableName,
-                columnResults[0].rows.map((col: any) => col.name)
-              )
+              // Group columns by table name
+              const columnsByTable: Record<string, string[]> = {}
+              const columnInfoByTable: Record<string, ColumnInfo[]> = {}
+              
+              columnResults[0].rows.forEach((col: any) => {
+                const tableName = col.table_name
+                
+                // For schemaMap (autocomplete - just column names)
+                if (!columnsByTable[tableName]) {
+                  columnsByTable[tableName] = []
+                }
+                columnsByTable[tableName].push(col.column_name)
+                
+                // For columnInfoCache (full column info for tree display)
+                if (!columnInfoByTable[tableName]) {
+                  columnInfoByTable[tableName] = []
+                }
+                columnInfoByTable[tableName].push({
+                  name: col.column_name,
+                  type: col.type,
+                  notnull: col.notnull_flag
+                })
+              })
+
+              // Populate schema map and column info cache
+              Object.entries(columnsByTable).forEach(([tableName, columns]) => {
+                newSchemaMap.set(tableName, columns)
+              })
+              Object.entries(columnInfoByTable).forEach(([tableName, columnInfos]) => {
+                newColumnInfoCache.set(tableName, columnInfos)
+              })
             }
           } catch (error) {
-            console.error(
-              `Failed to preload columns for ${row.table_name}:`,
-              error
-            )
+            console.error('Failed to batch preload columns:', error)
+            // Fallback: Don't populate schemaMap, columns will be loaded on-demand
           }
         }
-        set({ schemaMap: newSchemaMap })
+        
+        set({ schemaMap: newSchemaMap, columnInfoCache: newColumnInfoCache })
       } else {
         set({ treeData: [] })
       }
@@ -124,14 +166,50 @@ export const useSchemaStore = create<SchemaStoreState>((set, get) => ({
    * Lazy load children for a specific node (columns for tables)
    */
   fetchChildrenForNode: async (nodeKey: string, node: TreeNodeData) => {
-    const { loadingKeys, schemaMap } = get()
+    const { loadingKeys, columnInfoCache } = get()
 
     // Prevent duplicate loading
     if (loadingKeys.has(nodeKey)) {
       return
     }
 
-    // Mark as loading
+    // Check if tree already has children loaded
+    if (node.children && node.children.length > 0) {
+      // Already loaded in tree, no need to fetch again
+      return
+    }
+
+    // Check if columns are in the cache (loaded during initialization)
+    if (node.type === 'table' && columnInfoCache.has(node.tableName!)) {
+      // Build tree nodes from cache - NO HTTP REQUEST needed!
+      const cachedColumnInfo = columnInfoCache.get(node.tableName!)!
+      
+      const columnNodes: TreeNodeData[] = cachedColumnInfo.map(
+        (col: ColumnInfo) => ({
+          key: `column-${node.tableName}-${col.name}`,
+          title: `${col.name} (${col.type})`,
+          type: 'column',
+          icon: React.createElement(ColumnHeightOutlined),
+          isLeaf: true,
+          columnInfo: {
+            column_name: col.name,
+            data_type: col.type,
+            is_nullable: col.notnull === 0 ? 'YES' : 'NO'
+          },
+          tableName: node.tableName
+        })
+      )
+
+      // Update tree with column nodes (synchronously from cache)
+      set(state => ({
+        treeData: updateNodeInTree(state.treeData, nodeKey, {
+          children: columnNodes
+        })
+      }))
+      return
+    }
+
+    // Not in cache - fetch from server (fallback case)
     set(state => ({
       loadingKeys: new Set(state.loadingKeys).add(nodeKey)
     }))
@@ -170,13 +248,25 @@ export const useSchemaStore = create<SchemaStoreState>((set, get) => ({
             })
           }))
 
-          // Update schema map for autocomplete
+          // Update both caches for future use
+          const { schemaMap, columnInfoCache } = get()
           const newSchemaMap = new Map(schemaMap)
+          const newColumnInfoCache = new Map(columnInfoCache)
+          
           newSchemaMap.set(
             node.tableName!,
             results[0].rows.map((col: any) => col.name)
           )
-          set({ schemaMap: newSchemaMap })
+          newColumnInfoCache.set(
+            node.tableName!,
+            results[0].rows.map((col: any) => ({
+              name: col.name,
+              type: col.type,
+              notnull: col.notnull
+            }))
+          )
+          
+          set({ schemaMap: newSchemaMap, columnInfoCache: newColumnInfoCache })
         }
       }
     } catch (error) {
