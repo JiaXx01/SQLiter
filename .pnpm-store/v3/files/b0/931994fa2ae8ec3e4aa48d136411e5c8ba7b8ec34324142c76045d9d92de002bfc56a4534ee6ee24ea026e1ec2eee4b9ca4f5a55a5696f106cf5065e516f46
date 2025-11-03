@@ -1,0 +1,90 @@
+{
+  "name": "react-resizable-layout",
+  "description": "Lightweight, accessible headless React component and hook for drag-and-drop resizable layouts.",
+  "author": "RyoSogawa",
+  "version": "0.7.3",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/RyoSogawa/react-resizable-layout.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RyoSogawa/react-resizable-layout/issues"
+  },
+  "homepage": "https://github.com/RyoSogawa/react-resizable-layout",
+  "keywords": [
+    "react",
+    "react-hooks",
+    "react-component",
+    "headless",
+    "dnd",
+    "resize",
+    "typescript"
+  ],
+  "files": [
+    "lib"
+  ],
+  "main": "./lib/index.js",
+  "module": "./lib/index.module.js",
+  "types": "./lib/index.d.ts",
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  },
+  "devDependencies": {
+    "@storybook/addon-actions": "^8.4.5",
+    "@storybook/addon-essentials": "^8.4.5",
+    "@storybook/addon-links": "^8.4.5",
+    "@storybook/addon-storysource": "^8.4.5",
+    "@storybook/react": "^8.4.5",
+    "@storybook/react-vite": "^8.4.5",
+    "@storybook/test": "^8.4.5",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "@vitejs/plugin-react": "^4.3.3",
+    "babel-loader": "^8.4.1",
+    "eslint": "^8.57.1",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-airbnb-typescript": "^17.1.0",
+    "eslint-config-prettier": "^8.10.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.2",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-storybook": "0.9.0",
+    "husky": "^7.0.0",
+    "lint-staged": "^12.3.3",
+    "microbundle": "^0.15.0",
+    "prettier": "^2.8.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "rimraf": "^6.0.1",
+    "storybook": "^8.4.5",
+    "typescript": "^5.7.2",
+    "vite": "^4.2.1"
+  },
+  "lint-staged": {
+    "*.{js,ts,jsx,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "volta": {
+    "node": "22.18.0"
+  },
+  "scripts": {
+    "prebuild": "rimraf ./lib",
+    "build": "microbundle --jsx React.createElement --no-sourcemap --compress --tsconfig ./tsconfig.build.json",
+    "format": "prettier --write \"(src|stories)/*.(js|ts|jsx|tsx)\"",
+    "lint": "eslint ./src ./stories",
+    "lint:fix": "pnpm lint --fix",
+    "test": "tsc --noEmit && pnpm lint",
+    "preversion": "pnpm lint",
+    "version": "pnpm format && git add -A src",
+    "postversion": "git push && git push --tags",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build -o ./docs"
+  }
+}

@@ -1,0 +1,4 @@
+import type { ResizableProps } from './types';
+declare const Resizable: ({ axis, disabled, initial, min, max, reverse, onResizeStart, onResizeEnd, children, containerRef, }: ResizableProps) => JSX.Element;
+export default Resizable;
+//# sourceMappingURL=Resizable.d.ts.map

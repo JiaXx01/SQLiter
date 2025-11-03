@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" fill="none">
+  <!-- Icon part -->
+  <g transform="translate(10, 10)">
+    <!-- Database cylinder - top -->
+    <ellipse cx="50" cy="35" rx="30" ry="10" fill="#0EA5E9"/>
+    
+    <!-- Database cylinder - body -->
+    <rect x="20" y="35" width="60" height="40" fill="#0284C7"/>
+    
+    <!-- Database cylinder - bottom -->
+    <ellipse cx="50" cy="75" rx="30" ry="10" fill="#0369A1"/>
+    
+    <!-- Cylinder lines -->
+    <ellipse cx="50" cy="50" rx="30" ry="10" fill="none" stroke="#E0F2FE" stroke-width="1.5" opacity="0.5"/>
+    <ellipse cx="50" cy="62" rx="30" ry="10" fill="none" stroke="#E0F2FE" stroke-width="1.5" opacity="0.5"/>
+    
+    <!-- Lightning bolt -->
+    <path d="M 58 25 L 48 48 L 54 48 L 42 70 L 60 50 L 54 50 Z" 
+          fill="#FCD34D" 
+          stroke="#F59E0B" 
+          stroke-width="1.5"
+          stroke-linejoin="round"/>
+  </g>
+  
+  <!-- Text part -->
+  <text x="120" y="70" font-family="Arial, sans-serif" font-size="48" font-weight="bold" fill="#0F172A">
+    SQLiter
+  </text>
+  
+  <!-- Tagline -->
+  <text x="122" y="95" font-family="Arial, sans-serif" font-size="14" fill="#64748B" letter-spacing="1">
+    SQLite Database Manager
+  </text>
+</svg>
+

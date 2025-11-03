@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="90" fill="#0EA5E9" opacity="0.1"/>
+  
+  <!-- Database cylinder - top -->
+  <ellipse cx="100" cy="70" rx="50" ry="15" fill="#0EA5E9"/>
+  
+  <!-- Database cylinder - body -->
+  <rect x="50" y="70" width="100" height="60" fill="#0284C7"/>
+  
+  <!-- Database cylinder - bottom -->
+  <ellipse cx="100" cy="130" rx="50" ry="15" fill="#0369A1"/>
+  
+  <!-- Cylinder lines (data layers) -->
+  <ellipse cx="100" cy="90" rx="50" ry="15" fill="none" stroke="#E0F2FE" stroke-width="2" opacity="0.6"/>
+  <ellipse cx="100" cy="110" rx="50" ry="15" fill="none" stroke="#E0F2FE" stroke-width="2" opacity="0.6"/>
+  
+  <!-- Lightning bolt (representing speed/lite) -->
+  <path d="M 110 50 L 95 85 L 105 85 L 90 120 L 115 90 L 105 90 Z" 
+        fill="#FCD34D" 
+        stroke="#F59E0B" 
+        stroke-width="2"
+        stroke-linejoin="round"/>
+  
+  <!-- Sparkle effect -->
+  <circle cx="130" cy="60" r="3" fill="#FCD34D"/>
+  <circle cx="140" cy="75" r="2" fill="#FCD34D" opacity="0.7"/>
+  <circle cx="125" cy="48" r="2" fill="#FCD34D" opacity="0.7"/>
+</svg>
+
