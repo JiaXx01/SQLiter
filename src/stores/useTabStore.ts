@@ -7,7 +7,7 @@ import type {
   ApiResult,
   FilterCondition
 } from '../types'
-import { apiService } from '../services/api.service'
+import { apiService, escapeIdentifier, toSqlValue } from '../services/api.service'
 
 interface TabStoreState {
   tabs: Tab[]
@@ -79,13 +79,14 @@ function buildWhereClause(conditions: FilterCondition[]): string {
 
   const clauses = validConditions.map((condition, index) => {
     const { field, operator, value } = condition
+    const escapedField = escapeIdentifier(field)
     let clause = ''
 
     // Handle NULL operators
     if (operator === 'IS NULL') {
-      clause = `${field} IS NULL`
+      clause = `${escapedField} IS NULL`
     } else if (operator === 'IS NOT NULL') {
-      clause = `${field} IS NOT NULL`
+      clause = `${escapedField} IS NOT NULL`
     }
     // Handle IN operators
     else if (operator === 'IN' || operator === 'NOT IN') {
@@ -98,11 +99,11 @@ function buildWhereClause(conditions: FilterCondition[]): string {
         }
         return `'${trimmed.replace(/'/g, "''")}'`
       })
-      clause = `${field} ${operator} (${values.join(', ')})`
+      clause = `${escapedField} ${operator} (${values.join(', ')})`
     }
     // Handle LIKE operators
     else if (operator === 'LIKE' || operator === 'NOT LIKE') {
-      clause = `${field} ${operator} '${value.replace(/'/g, "''")}'`
+      clause = `${escapedField} ${operator} '${value.replace(/'/g, "''")}'`
     }
     // Handle comparison operators
     else {
@@ -111,7 +112,7 @@ function buildWhereClause(conditions: FilterCondition[]): string {
         !isNaN(Number(value)) && value.trim() !== ''
           ? value
           : `'${value.replace(/'/g, "''")}'`
-      clause = `${field} ${operator} ${sqlValue}`
+      clause = `${escapedField} ${operator} ${sqlValue}`
     }
 
     // Add logic operator (AND/OR) except for the last condition
@@ -293,9 +294,12 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
     try {
       const { tableName, page, pageSize, filterConditions } = tab
       const offset = (page - 1) * pageSize
+      const escapedTableName = escapeIdentifier(tableName)
 
       // Load column info (including primary key) - SQLite uses PRAGMA
-      const columnsSql = `PRAGMA table_info(${tableName})`
+      // Note: PRAGMA table_info requires single-quoted strings for reserved keywords
+      // Double quotes don't work, but single quotes do
+      const columnsSql = `PRAGMA table_info('${tableName.replace(/'/g, "''")}')`
       const columnsResults = await apiService.execute(columnsSql)
 
       if (columnsResults[0]?.error) {
@@ -328,7 +332,7 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       // Always load rowid for consistent row identification
       // This simplifies logic for tracking changes, especially when PK is modified
-      const dataSql = `SELECT rowid, * FROM ${tableName}${whereClause} LIMIT ${pageSize} OFFSET ${offset}`
+      const dataSql = `SELECT rowid, * FROM ${escapedTableName}${whereClause} LIMIT ${pageSize} OFFSET ${offset}`
       const dataResults = await apiService.execute(dataSql)
 
       if (dataResults[0]?.error) {
@@ -421,22 +425,14 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       // Generate UPDATE statements for each dirty row
       // Now using rowid as the stable identifier
       const updateStatements: string[] = []
+      const escapedTableName = escapeIdentifier(tab.tableName)
 
       tab.dirtyChanges.forEach((changes, rowid) => {
         const setClauses = Object.entries(changes)
           .map(([colName, value]) => {
-            // Proper SQL escaping
-            const sqlValue =
-              typeof value === 'string'
-                ? `'${value.replace(/'/g, "''")}'`
-                : value === null
-                ? 'NULL'
-                : typeof value === 'boolean'
-                ? value
-                  ? 1
-                  : 0
-                : value
-            return `${colName} = ${sqlValue}`
+            const escapedColName = escapeIdentifier(colName)
+            const sqlValue = toSqlValue(value)
+            return `${escapedColName} = ${sqlValue}`
           })
           .join(', ')
 
@@ -444,7 +440,7 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
         const whereClause = `rowid = ${rowid}`
 
         updateStatements.push(
-          `UPDATE ${tab.tableName} SET ${setClauses} WHERE ${whereClause}`
+          `UPDATE ${escapedTableName} SET ${setClauses} WHERE ${whereClause}`
         )
       })
 
@@ -495,18 +491,11 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       const columns = Object.keys(rowData).filter(
         col => rowData[col] !== undefined
       )
-      const values = columns.map(col => {
-        const value = rowData[col]
-        if (value === null) {
-          return 'NULL'
-        } else if (typeof value === 'string') {
-          return `'${value.replace(/'/g, "''")}'`
-        } else {
-          return value
-        }
-      })
+      const escapedTableName = escapeIdentifier(tab.tableName)
+      const escapedColumns = columns.map(col => escapeIdentifier(col))
+      const values = columns.map(col => toSqlValue(rowData[col]))
 
-      const sql = `INSERT INTO ${tab.tableName} (${columns.join(
+      const sql = `INSERT INTO ${escapedTableName} (${escapedColumns.join(
         ', '
       )}) VALUES (${values.join(', ')})`
       const results = await apiService.execute(sql)
@@ -558,8 +547,9 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
     try {
       // Build DELETE statements using rowid - simple and consistent
+      const escapedTableName = escapeIdentifier(tab.tableName)
       const deleteStatements = rowids.map(rowid => {
-        return `DELETE FROM ${tab.tableName} WHERE rowid = ${rowid}`
+        return `DELETE FROM ${escapedTableName} WHERE rowid = ${rowid}`
       })
 
       const batchSql = deleteStatements.join('; ')
@@ -618,7 +608,8 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
     try {
       // SQLite uses PRAGMA table_info
-      const sql = `PRAGMA table_info(${tab.tableName})`
+      // PRAGMA requires single-quoted strings for reserved keywords
+      const sql = `PRAGMA table_info('${tab.tableName.replace(/'/g, "''")}')`
       const results = await apiService.execute(sql)
 
       if (results[0]?.error) {
@@ -674,17 +665,20 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
     try {
       // Generate ALTER TABLE statements
       const alterStatements: string[] = []
+      const escapedTableName = escapeIdentifier(tab.tableName)
 
       tab.dirtyStructureChanges.forEach((changes, columnName) => {
+        const escapedColumnName = escapeIdentifier(columnName)
         // Simplified: only handle column rename and type change
         if (changes.column_name && changes.column_name !== columnName) {
+          const escapedNewColumnName = escapeIdentifier(changes.column_name)
           alterStatements.push(
-            `ALTER TABLE ${tab.tableName} RENAME COLUMN ${columnName} TO ${changes.column_name}`
+            `ALTER TABLE ${escapedTableName} RENAME COLUMN ${escapedColumnName} TO ${escapedNewColumnName}`
           )
         }
         if (changes.data_type) {
           alterStatements.push(
-            `ALTER TABLE ${tab.tableName} ALTER COLUMN ${columnName} TYPE ${changes.data_type}`
+            `ALTER TABLE ${escapedTableName} ALTER COLUMN ${escapedColumnName} TYPE ${changes.data_type}`
           )
         }
       })

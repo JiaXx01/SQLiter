@@ -90,7 +90,11 @@ export const useSchemaStore = create<SchemaStoreState>((set, get) => ({
         for (const row of results[0].rows) {
           try {
             const tableName = row.table_name
-            const columnSql = `PRAGMA table_info(${tableName})`
+            // PRAGMA table_info requires single-quoted table name for reserved keywords
+            const columnSql = `PRAGMA table_info('${tableName.replace(
+              /'/g,
+              "''"
+            )}')`
             const columnResults = await apiService.execute(columnSql)
 
             if (columnResults[0]?.rows) {
@@ -135,7 +139,11 @@ export const useSchemaStore = create<SchemaStoreState>((set, get) => ({
     try {
       if (node.type === 'table') {
         // Fetch columns for this table using SQLite's PRAGMA
-        const sql = `PRAGMA table_info(${node.tableName})`
+        // PRAGMA table_info requires single-quoted table name for reserved keywords
+        const sql = `PRAGMA table_info('${node.tableName!.replace(
+          /'/g,
+          "''"
+        )}')`
         const results = await apiService.execute(sql)
 
         if (results[0]?.rows) {

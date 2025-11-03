@@ -20,6 +20,7 @@ import {
   EyeOutlined
 } from '@ant-design/icons'
 import type { ColumnType } from 'antd/es/table'
+import { escapeIdentifier } from '../services/api.service'
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -91,7 +92,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
     }
 
     const columnDefinitions = columns.map(col => {
-      const parts: string[] = [`  ${col.name}`]
+      const parts: string[] = [`  ${escapeIdentifier(col.name)}`]
 
       // Data type
       parts.push(col.type)
@@ -139,7 +140,7 @@ export const CreateTableDialog: React.FC<CreateTableDialogProps> = ({
       return parts.join(' ')
     })
 
-    return `CREATE TABLE ${tableName} (\n${columnDefinitions.join(',\n')}\n);`
+    return `CREATE TABLE ${escapeIdentifier(tableName)} (\n${columnDefinitions.join(',\n')}\n);`
   }
 
   // Add new column
