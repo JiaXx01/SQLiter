@@ -11,6 +11,7 @@ import { useTabStore } from '../stores/useTabStore'
 import { EditableGrid } from './EditableGrid'
 import { AddRowDialog } from './AddRowDialog'
 import { FilterBuilder } from './FilterBuilder'
+import { ColumnSelector } from './ColumnSelector'
 import type { TableViewTab, FilterCondition } from '../types'
 
 interface TableViewPanelProps {
@@ -40,7 +41,15 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
 
   const [addRowDialogVisible, setAddRowDialogVisible] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([])
   const tableContainerRef = React.useRef<HTMLDivElement>(null)
+
+  // Initialize visible columns when tab columns are loaded
+  useEffect(() => {
+    if (tab && tab.columns.length > 0 && visibleColumns.length === 0) {
+      setVisibleColumns(tab.columns.map(col => col.column_name))
+    }
+  }, [tab?.columns])
 
   useEffect(() => {
     if (tab) {
@@ -128,6 +137,10 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
     updateFilterConditions(tabKey, conditions)
   }
 
+  const handleVisibleColumnsChange = (newVisibleColumns: string[]) => {
+    setVisibleColumns(newVisibleColumns)
+  }
+
   const hasDirtyChanges = tab.dirtyChanges.size > 0
 
   return (
@@ -174,6 +187,11 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
             Delete Selected{' '}
             {selectedRowKeys.length > 0 && `(${selectedRowKeys.length})`}
           </Button>
+          <ColumnSelector
+            columns={tab.columns}
+            visibleColumns={visibleColumns}
+            onVisibleColumnsChange={handleVisibleColumnsChange}
+          />
         </Space>
 
         <div style={{ color: '#666', fontSize: '12px' }}>
@@ -254,6 +272,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
                     dirtyChanges={tab.dirtyChanges}
                     selectedRowKeys={selectedRowKeys}
                     containerRef={tableContainerRef}
+                    visibleColumns={visibleColumns}
                     onCellValueChange={handleCellValueChange}
                     onSelectionChange={handleSelectionChange}
                   />

@@ -21,6 +21,7 @@ interface EditableGridProps {
   dirtyChanges: Map<number, Record<string, unknown>> // Now keyed by rowid
   selectedRowKeys?: React.Key[]
   containerRef?: React.RefObject<HTMLDivElement | null> // Reference to parent container for height calculation
+  visibleColumns?: string[] // Array of visible column names
   onCellValueChange: (
     rowid: number, // Changed from primaryKeyValue to rowid
     columnName: string,
@@ -281,6 +282,7 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
   dirtyChanges,
   selectedRowKeys = [],
   containerRef,
+  visibleColumns,
   onCellValueChange,
   onSelectionChange
 }) => {
@@ -317,8 +319,14 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
       window.removeEventListener('resize', updateHeight)
     }
   }, [containerRef])
+  
+  // Filter columns based on visibility selection
+  const filteredColumnInfo = visibleColumns
+    ? columnInfo.filter(col => visibleColumns.includes(col.column_name))
+    : columnInfo
+
   // Generate Ant Design columns from column info
-  const columns: ColumnsType<Record<string, unknown>> = columnInfo.map(col => {
+  const columns: ColumnsType<Record<string, unknown>> = filteredColumnInfo.map(col => {
     return {
       title: col.column_name,
       dataIndex: col.column_name,
