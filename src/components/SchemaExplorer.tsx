@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { Tree, Spin, Modal, message, Button } from 'antd'
+import React, { useEffect, useState, useMemo } from 'react'
+import { Tree, Spin, Modal, message, Button, Input } from 'antd'
 import type { DataNode, TreeProps } from 'antd/es/tree'
 import { useSchemaStore } from '../stores/useSchemaStore'
 import { useTabStore } from '../stores/useTabStore'
@@ -13,7 +13,8 @@ import {
   ExclamationCircleOutlined,
   ReloadOutlined,
   FileAddOutlined,
-  CodeOutlined
+  CodeOutlined,
+  SearchOutlined
 } from '@ant-design/icons'
 import { apiService } from '../services/api.service'
 
@@ -40,11 +41,22 @@ export const SchemaExplorer: React.FC = () => {
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [createTableDialogVisible, setCreateTableDialogVisible] =
     useState(false)
+  const [searchValue, setSearchValue] = useState<string>('')
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState<string>('')
 
   // Load initial schema on mount
   useEffect(() => {
     fetchInitialSchema()
   }, [fetchInitialSchema])
+
+  // Debounce search value to avoid excessive filtering
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchValue(searchValue)
+    }, 300) // 300ms debounce delay
+
+    return () => clearTimeout(timer)
+  }, [searchValue])
 
   // Sync tree selection with active tab
   useEffect(() => {
@@ -97,6 +109,23 @@ export const SchemaExplorer: React.FC = () => {
       setSelectedKeys([])
     }
   }, [activeKey, tabs, treeData])
+
+  /**
+   * Filter tree data based on debounced search value
+   * Using useMemo to avoid unnecessary recalculations
+   */
+  const filteredTreeData = useMemo(() => {
+    if (!debouncedSearchValue) return treeData
+
+    const lowerSearch = debouncedSearchValue.toLowerCase()
+    return treeData.filter(node => {
+      // For table nodes, filter by table name
+      if (node.type === 'table') {
+        return node.tableName?.toLowerCase().includes(lowerSearch)
+      }
+      return true
+    })
+  }, [treeData, debouncedSearchValue])
 
   /**
    * Convert TreeNodeData to Ant Design DataNode format
@@ -386,13 +415,24 @@ export const SchemaExplorer: React.FC = () => {
         />
       </div>
 
+      {/* Search Box */}
+      <div style={{ padding: '8px 12px' }}>
+        <Input
+          placeholder="Search tables..."
+          prefix={<SearchOutlined />}
+          value={searchValue}
+          onChange={e => setSearchValue(e.target.value)}
+          allowClear
+        />
+      </div>
+
       {/* Tree */}
       <div style={{ flex: 1, paddingRight: '4px', overflowY: 'auto' }}>
         <Spin spinning={loadingKeys.size > 0}>
           <Tree
             showIcon
             loadData={onLoadData}
-            treeData={convertToDataNode(treeData)}
+            treeData={convertToDataNode(filteredTreeData)}
             onRightClick={handleRightClick}
             className="schema-tree"
             selectedKeys={selectedKeys}
