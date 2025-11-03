@@ -12,6 +12,7 @@
 
 .workspace-tabs > .ant-tabs-nav {
   flex-shrink: 0;
+  height: 46px;
 }
 
 .workspace-tabs > .ant-tabs-content-holder {

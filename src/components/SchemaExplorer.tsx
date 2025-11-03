@@ -390,12 +390,14 @@ export const SchemaExplorer: React.FC = () => {
       {/* Toolbar */}
       <div
         style={{
+          height: '46px',
           padding: '8px 12px',
           borderBottom: '1px solid #f0f0f0',
           backgroundColor: '#fafafa',
           display: 'flex',
           gap: '8px',
-          justifyContent: 'space-around'
+          justifyContent: 'space-around',
+          alignItems: 'center'
         }}
       >
         <Button
