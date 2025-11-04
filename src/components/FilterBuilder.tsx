@@ -131,7 +131,6 @@ export const FilterBuilder: React.FC<FilterBuilderProps> = ({
   return (
     <Collapse
       defaultActiveKey={localConditions.length > 0 ? ['filter'] : []}
-      style={{ marginBottom: 16 }}
       items={[
         {
           key: 'filter',

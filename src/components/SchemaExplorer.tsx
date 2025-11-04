@@ -429,7 +429,7 @@ export const SchemaExplorer: React.FC = () => {
       </div>
 
       {/* Tree */}
-      <div style={{ flex: 1, paddingRight: '4px', overflowY: 'auto' }}>
+      <div style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }}>
         <Spin spinning={loadingKeys.size > 0}>
           <Tree
             showIcon

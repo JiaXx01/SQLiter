@@ -144,11 +144,17 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
   const hasDirtyChanges = tab.dirtyChanges.size > 0
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column'
+      }}
+    >
       {/* Toolbar */}
       <div
         style={{
-          padding: '8px 8px 0 8px',
+          padding: '8px 12px 0 12px',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
@@ -222,7 +228,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
         )}
 
         {/* Filter Builder - Auto height based on content */}
-        <div style={{ padding: '8px 8px 0 8px', flexShrink: 0 }}>
+        <div style={{ padding: '8px 12px 0 12px', flexShrink: 0 }}>
           <FilterBuilder
             columns={tab.columns}
             conditions={tab.filterConditions}
@@ -238,7 +244,8 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
             minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            marginTop: '8px'
           }}
         >
           {/* Data Grid - Scrollable area */}
@@ -246,7 +253,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
             style={{
               flex: 1,
               minHeight: 0,
-              padding: '0 8px',
+              padding: '0 12px 0 12px',
               overflow: 'hidden'
             }}
           >
@@ -285,7 +292,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
           {tab.data.length > 0 && (
             <div
               style={{
-                padding: '8px 16px',
+                padding: '8px 12px',
                 borderTop: '1px solid #f0f0f0',
                 display: 'flex',
                 justifyContent: 'flex-end',
