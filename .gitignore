@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 docs
+.pnpm-store
 
 # Editor directories and files
 .vscode/*
@@ -23,3 +24,4 @@ docs
 *.njsproj
 *.sln
 *.sw?
+.pnpm-store
