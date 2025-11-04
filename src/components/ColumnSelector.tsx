@@ -2,7 +2,6 @@ import React from 'react'
 import { Button, Dropdown, Checkbox, Space, Divider } from 'antd'
 import { ColumnHeightOutlined } from '@ant-design/icons'
 import type { ColumnInfo } from '../types'
-import type { MenuProps } from 'antd'
 
 interface ColumnSelectorProps {
   columns: ColumnInfo[]

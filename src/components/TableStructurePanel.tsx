@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
-import { Button, Space, Alert, Spin, Table } from 'antd'
-import { ReloadOutlined, SaveOutlined } from '@ant-design/icons'
+import { Button, Space, Alert, Spin, Table, Tag } from 'antd'
+import { ReloadOutlined, SaveOutlined, KeyOutlined } from '@ant-design/icons'
 import { useTabStore } from '../stores/useTabStore'
 import type { TableStructureTab } from '../types'
 import type { ColumnsType } from 'antd/es/table'
@@ -49,7 +49,13 @@ export const TableStructurePanel: React.FC<TableStructurePanelProps> = ({
       title: 'Column Name',
       dataIndex: 'column_name',
       key: 'column_name',
-      width: 200
+      width: 200,
+      render: (val, record) => (
+        <Space>
+          {record.is_primary_key && <KeyOutlined style={{ color: '#faad14' }} />}
+          <span style={{ fontWeight: record.is_primary_key ? 600 : 400 }}>{val}</span>
+        </Space>
+      )
     },
     {
       title: 'Data Type',
@@ -61,7 +67,21 @@ export const TableStructurePanel: React.FC<TableStructurePanelProps> = ({
       title: 'Nullable',
       dataIndex: 'is_nullable',
       key: 'is_nullable',
-      width: 100
+      width: 100,
+      render: val => (
+        <Tag color={val === 'NO' ? 'red' : 'default'}>
+          {val}
+        </Tag>
+      )
+    },
+    {
+      title: 'Primary Key',
+      dataIndex: 'is_primary_key',
+      key: 'is_primary_key',
+      width: 100,
+      render: val => (
+        val ? <Tag color="gold">PK</Tag> : '-'
+      )
     },
     {
       title: 'Default',

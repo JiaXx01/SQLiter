@@ -6,9 +6,15 @@ import {
   Form,
   Select,
   DatePicker,
-  Modal
+  Modal,
+  Tooltip
 } from 'antd'
-import { ExclamationCircleOutlined } from '@ant-design/icons'
+import {
+  ExclamationCircleOutlined,
+  KeyOutlined,
+  CloseCircleOutlined,
+  CheckCircleOutlined
+} from '@ant-design/icons'
 import type { InputRef } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import type { ColumnInfo } from '../types'
@@ -319,76 +325,130 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
       window.removeEventListener('resize', updateHeight)
     }
   }, [containerRef])
-  
+
   // Filter columns based on visibility selection
   const filteredColumnInfo = visibleColumns
     ? columnInfo.filter(col => visibleColumns.includes(col.column_name))
     : columnInfo
 
   // Generate Ant Design columns from column info
-  const columns: ColumnsType<Record<string, unknown>> = filteredColumnInfo.map(col => {
-    return {
-      title: col.column_name,
-      dataIndex: col.column_name,
-      key: col.column_name,
-      width: 150,
-      ellipsis: true,
-      onCell: (record: Record<string, unknown>) => {
-        // Determine if this cell is editable
-        // - rowid is never editable (system column)
-        // - all other columns (including primary key) are editable
-        const isEditable = col.column_name !== 'rowid'
+  const columns: ColumnsType<Record<string, unknown>> = filteredColumnInfo.map(
+    col => {
+      // Build column title with metadata
+      const isPK = col.column_name === primaryKey || col.is_primary_key
+      const isNotNull = col.is_nullable === 'NO'
+      const hasDefault =
+        col.column_default !== null && col.column_default !== undefined
 
-        // Get rowid for this row - now the stable identifier
-        const rowid = record.rowid as number
-
-        return {
-          record,
-          editable: isEditable,
-          dataIndex: col.column_name,
-          title: col.column_name,
-          dataType: col.data_type,
-          isPrimaryKey: col.column_name === primaryKey,
-          onSave: (newValue: string | number | boolean | null) => {
-            // Simply pass rowid - no complex logic needed
-            onCellValueChange(rowid, col.column_name, newValue)
-          }
-        }
-      },
-      render: (value: unknown, record: Record<string, unknown>) => {
-        // Check if this cell has been modified
-        // Now using rowid - simple and direct
-        const rowid = record.rowid as number
-        const isDirty =
-          dirtyChanges.has(rowid) &&
-          dirtyChanges.get(rowid)?.[col.column_name] !== undefined
-
-        return (
-          <div style={{ position: 'relative' }}>
-            {isDirty && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: 0,
-                  height: 0,
-                  borderLeft: '8px solid #ff4d4f',
-                  borderBottom: '8px solid transparent'
-                }}
-                title="Modified"
-              />
+      const columnTitle = (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div
+            style={{
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }}
+          >
+            {col.column_name}
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <span style={{ color: '#1677ff', fontSize: '11px' }}>
+              {col.data_type}
+            </span>
+            {isPK && (
+              <Tooltip title="Primary Key">
+                <KeyOutlined style={{ color: '#faad14', fontSize: '12px' }} />
+              </Tooltip>
             )}
-            {value === null ? (
-              <span style={{ color: '#999' }}>(null)</span>
-            ) : (
-              String(value)
+            {isNotNull && (
+              <Tooltip title="NOT NULL">
+                <CloseCircleOutlined
+                  style={{ color: '#ff4d4f', fontSize: '12px' }}
+                />
+              </Tooltip>
+            )}
+            {hasDefault && (
+              <Tooltip title={`Default: ${col.column_default}`}>
+                <CheckCircleOutlined
+                  style={{ color: '#52c41a', fontSize: '12px' }}
+                />
+              </Tooltip>
             )}
           </div>
-        )
+        </div>
+      )
+
+      return {
+        title: columnTitle,
+        dataIndex: col.column_name,
+        key: col.column_name,
+        width: 150,
+        ellipsis: true,
+        onCell: (record: Record<string, unknown>) => {
+          // Determine if this cell is editable
+          // - rowid is never editable (system column)
+          // - all other columns (including primary key) are editable
+          const isEditable = col.column_name !== 'rowid'
+
+          // Get rowid for this row - now the stable identifier
+          const rowid = record.rowid as number
+
+          return {
+            record,
+            editable: isEditable,
+            dataIndex: col.column_name,
+            title: col.column_name,
+            dataType: col.data_type,
+            isPrimaryKey: col.column_name === primaryKey,
+            onSave: (newValue: string | number | boolean | null) => {
+              // Simply pass rowid - no complex logic needed
+              onCellValueChange(rowid, col.column_name, newValue)
+            }
+          }
+        },
+        render: (value: unknown, record: Record<string, unknown>) => {
+          // Check if this cell has been modified
+          // Now using rowid - simple and direct
+          const rowid = record.rowid as number
+          const isDirty =
+            dirtyChanges.has(rowid) &&
+            dirtyChanges.get(rowid)?.[col.column_name] !== undefined
+
+          return (
+            <div style={{ position: 'relative' }}>
+              {isDirty && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: 0,
+                    height: 0,
+                    borderLeft: '8px solid #ff4d4f',
+                    borderBottom: '8px solid transparent'
+                  }}
+                  title="Modified"
+                />
+              )}
+              {value === null ? (
+                <span style={{ color: '#999' }}>(null)</span>
+              ) : (
+                String(value)
+              )}
+            </div>
+          )
+        }
       }
     }
-  })
+  )
 
   // Add selection column
   const rowSelection = onSelectionChange
