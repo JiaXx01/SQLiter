@@ -1,5 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React from 'react'
 import { Layout } from 'antd'
+import { Resizable } from 'react-resizable'
+import type { ResizeCallbackData } from 'react-resizable'
+import 'react-resizable/css/styles.css'
 
 const { Sider } = Layout
 
@@ -16,6 +19,7 @@ interface ResizableSiderProps {
  * ResizableSider Component
  *
  * A resizable sidebar that allows users to drag the right edge to adjust width
+ * Implemented using react-resizable library
  */
 export const ResizableSider: React.FC<ResizableSiderProps> = ({
   children,
@@ -25,105 +29,59 @@ export const ResizableSider: React.FC<ResizableSiderProps> = ({
   theme = 'light',
   style = {}
 }) => {
-  const [width, setWidth] = useState(defaultWidth)
-  const [isResizing, setIsResizing] = useState(false)
-  const siderRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = React.useState(defaultWidth)
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return
-
-      const newWidth = e.clientX
-      const clampedWidth = Math.min(Math.max(newWidth, minWidth), maxWidth)
-      setWidth(clampedWidth)
-    }
-
-    const handleMouseUp = () => {
-      setIsResizing(false)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [isResizing, minWidth, maxWidth])
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
+  const onResize = (_e: React.SyntheticEvent, data: ResizeCallbackData) => {
+    setWidth(data.size.width)
   }
 
   return (
-    <div
-      ref={siderRef}
-      style={{
-        position: 'relative',
-        width: `${width}px`,
-        flexShrink: 0
-      }}
-    >
-      <Sider
-        width={width}
-        theme={theme}
-        style={{
-          ...style,
-          width: '100%',
-          maxWidth: 'none',
-          minWidth: 'none',
-          flex: 'none'
-        }}
-      >
-        {children}
-      </Sider>
-
-      {/* Resize Handle */}
-      <div
-        onMouseDown={handleMouseDown}
-        style={{
-          position: 'absolute',
-          top: 0,
-          right: 0,
-          bottom: 0,
-          width: '4px',
-          cursor: 'col-resize',
-          backgroundColor: 'transparent',
-          zIndex: 10,
-          transition: isResizing ? 'none' : 'background-color 0.2s'
-        }}
-        onMouseEnter={e => {
-          if (!isResizing) {
+    <Resizable
+      width={width}
+      height={0}
+      minConstraints={[minWidth, 0]}
+      maxConstraints={[maxWidth, Infinity]}
+      onResize={onResize}
+      axis="x"
+      resizeHandles={['e']}
+      handle={
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: '2px',
+            cursor: 'col-resize',
+            backgroundColor: 'transparent',
+            zIndex: 10,
+            transition: 'background-color 0.2s'
+          }}
+          className="custom-handle custom-handle-e"
+          onMouseEnter={e => {
             e.currentTarget.style.backgroundColor = '#1890ff'
-          }
-        }}
-        onMouseLeave={e => {
-          if (!isResizing) {
+          }}
+          onMouseLeave={e => {
             e.currentTarget.style.backgroundColor = 'transparent'
-          }
-        }}
-      >
-        {/* Visual indicator when resizing */}
-        {isResizing && (
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              bottom: 0,
-              left: 0,
-              width: '4px',
-              backgroundColor: '#1890ff'
-            }}
-          />
-        )}
+          }}
+        />
+      }
+    >
+      <div style={{ width: `${width}px`, position: 'relative' }}>
+        <Sider
+          width={width}
+          theme={theme}
+          style={{
+            ...style,
+            width: '100%',
+            maxWidth: 'none',
+            minWidth: 'none',
+            flex: 'none'
+          }}
+        >
+          {children}
+        </Sider>
       </div>
-    </div>
+    </Resizable>
   )
 }

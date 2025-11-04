@@ -299,7 +299,7 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
       if (containerRef?.current) {
         const height = containerRef.current.clientHeight
         // Reserve space for table header (~55px) and some margin
-        const scrollHeight = Math.max(200, height - 100)
+        const scrollHeight = Math.max(200, height - 120)
         setTableHeight(scrollHeight)
       }
     }
