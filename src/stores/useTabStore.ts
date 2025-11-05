@@ -40,6 +40,7 @@ interface TabStoreState {
   addNewRow: (key: string, rowData: Record<string, any>) => Promise<void>
   deleteRows: (key: string, rowids: number[]) => Promise<void>
   updateFilterConditions: (key: string, conditions: FilterCondition[]) => void
+  changePage: (key: string, page: number, pageSize: number) => void
 
   // Table Structure specific
   updateTableStructureTabState: (
@@ -330,6 +331,20 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       // Build WHERE clause from filter conditions
       const whereClause = buildWhereClause(filterConditions)
 
+      // Get total count for pagination
+      const countSql = `SELECT COUNT(*) as total FROM ${escapedTableName}${whereClause}`
+      const countResults = await apiService.execute(countSql)
+
+      if (countResults[0]?.error) {
+        get().updateTableViewTabState(key, {
+          isLoading: false,
+          error: countResults[0].error
+        })
+        return
+      }
+
+      const totalCount = countResults[0]?.rows?.[0]?.total || 0
+
       // Always load rowid for consistent row identification
       // This simplifies logic for tracking changes, especially when PK is modified
       const dataSql = `SELECT rowid, * FROM ${escapedTableName}${whereClause} LIMIT ${pageSize} OFFSET ${offset}`
@@ -350,7 +365,7 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
         data,
         columns,
         primaryKey,
-        total: data.length // In real app, would do COUNT(*) query
+        total: totalCount
       })
     } catch (error) {
       get().updateTableViewTabState(key, {
@@ -523,8 +538,25 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
    * Update filter conditions for a table view tab
    */
   updateFilterConditions: (key: string, conditions: FilterCondition[]) => {
-    get().updateTableViewTabState(key, { filterConditions: conditions })
+    // Reset to page 1 when filter changes
+    get().updateTableViewTabState(key, { filterConditions: conditions, page: 1 })
     // Automatically reload data with new filter conditions
+    get().loadTableData(key)
+  },
+
+  /**
+   * Change page or page size for a table view tab
+   */
+  changePage: (key: string, page: number, pageSize: number) => {
+    const state = get()
+    const tab = state.tabs.find(t => t.key === key)
+
+    if (!tab || tab.type !== 'table_view') {
+      return
+    }
+
+    // Update page and pageSize, then reload data
+    get().updateTableViewTabState(key, { page, pageSize })
     get().loadTableData(key)
   },
 

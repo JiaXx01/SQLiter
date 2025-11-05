@@ -38,6 +38,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
   const updateFilterConditions = useTabStore(
     state => state.updateFilterConditions
   )
+  const changePage = useTabStore(state => state.changePage)
 
   const [addRowDialogVisible, setAddRowDialogVisible] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
@@ -139,6 +140,10 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
 
   const handleVisibleColumnsChange = (newVisibleColumns: string[]) => {
     setVisibleColumns(newVisibleColumns)
+  }
+
+  const handlePageChange = (page: number, pageSize: number) => {
+    changePage(tabKey, page, pageSize)
   }
 
   const hasDirtyChanges = tab.dirtyChanges.size > 0
@@ -306,8 +311,10 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
                 total={tab.total}
                 showSizeChanger
                 showTotal={total => `Total ${total} rows`}
-                onChange={() => {}}
-                disabled
+                onChange={handlePageChange}
+                onShowSizeChange={handlePageChange}
+                pageSizeOptions={['10', '20', '50', '100', '200']}
+                disabled={tab.isLoading}
               />
             </div>
           )}
