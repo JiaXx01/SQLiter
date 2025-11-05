@@ -7,7 +7,11 @@ import type {
   ApiResult,
   FilterCondition
 } from '../types'
-import { apiService, escapeIdentifier, toSqlValue } from '../services/api.service'
+import {
+  apiService,
+  escapeIdentifier,
+  toSqlValue
+} from '../services/api.service'
 
 interface TabStoreState {
   tabs: Tab[]
@@ -347,7 +351,14 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       // Always load rowid for consistent row identification
       // This simplifies logic for tracking changes, especially when PK is modified
-      const dataSql = `SELECT rowid, * FROM ${escapedTableName}${whereClause} LIMIT ${pageSize} OFFSET ${offset}`
+      // Build explicit column list to avoid duplicate column names
+      const columnList = columns
+        .map((col: any) => escapeIdentifier(col.column_name))
+        .join(', ')
+
+      // Always use _rowid_ to access system rowid, avoiding conflicts with user-defined 'rowid' columns
+      // Use __rowid__ as alias to minimize chance of conflict with user columns
+      const dataSql = `SELECT _rowid_ AS __rowid__, ${columnList} FROM ${escapedTableName}${whereClause} LIMIT ${pageSize} OFFSET ${offset}`
       const dataResults = await apiService.execute(dataSql)
 
       if (dataResults[0]?.error) {
@@ -360,9 +371,15 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       const data = dataResults[0]?.rows || []
 
+      // Normalize: rename __rowid__ to rowid for internal use
+      const normalizedData = data.map((row: any) => ({
+        ...row,
+        rowid: row.__rowid__
+      }))
+
       get().updateTableViewTabState(key, {
         isLoading: false,
-        data,
+        data: normalizedData,
         columns,
         primaryKey,
         total: totalCount
@@ -451,8 +468,8 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
           })
           .join(', ')
 
-        // Simple WHERE clause using rowid - no need for complex logic
-        const whereClause = `rowid = ${rowid}`
+        // Use _rowid_ to ensure we're targeting the system rowid, not a user-defined column
+        const whereClause = `_rowid_ = ${rowid}`
 
         updateStatements.push(
           `UPDATE ${escapedTableName} SET ${setClauses} WHERE ${whereClause}`
@@ -539,7 +556,10 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
    */
   updateFilterConditions: (key: string, conditions: FilterCondition[]) => {
     // Reset to page 1 when filter changes
-    get().updateTableViewTabState(key, { filterConditions: conditions, page: 1 })
+    get().updateTableViewTabState(key, {
+      filterConditions: conditions,
+      page: 1
+    })
     // Automatically reload data with new filter conditions
     get().loadTableData(key)
   },
@@ -578,10 +598,10 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
     get().updateTableViewTabState(key, { isLoading: true, error: null })
 
     try {
-      // Build DELETE statements using rowid - simple and consistent
+      // Build DELETE statements using _rowid_ to ensure we target system rowid, not user column
       const escapedTableName = escapeIdentifier(tab.tableName)
       const deleteStatements = rowids.map(rowid => {
-        return `DELETE FROM ${escapedTableName} WHERE rowid = ${rowid}`
+        return `DELETE FROM ${escapedTableName} WHERE _rowid_ = ${rowid}`
       })
 
       const batchSql = deleteStatements.join('; ')
