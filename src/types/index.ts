@@ -46,7 +46,7 @@ export interface TableViewTab extends BaseTab {
   isLoading: boolean
   data: any[]
   columns: ColumnInfo[]
-  primaryKey: string // Assume single PK for simplicity
+  primaryKey: string | null // User-defined primary key column name, or null if no PK
   error: string | null
   dirtyChanges: Map<any, Record<string, any>> // Map<PrimaryKeyValue, ChangedFields>
   page: number

@@ -206,7 +206,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
         </Space>
 
         <div style={{ color: '#666', fontSize: '12px' }}>
-          Primary Key: {tab.primaryKey}
+          Primary Key: {tab.primaryKey || '(none - using rowid)'}
         </div>
       </div>
 

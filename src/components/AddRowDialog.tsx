@@ -5,7 +5,7 @@ import type { ColumnInfo } from '../types'
 interface AddRowDialogProps {
   visible: boolean
   columns: ColumnInfo[]
-  primaryKey: string
+  primaryKey: string | null
   onCancel: () => void
   onConfirm: (rowData: Record<string, any>) => Promise<void>
 }

@@ -23,13 +23,13 @@ import dayjs from 'dayjs'
 interface EditableGridProps {
   data: Record<string, unknown>[]
   columns: ColumnInfo[]
-  primaryKey: string
-  dirtyChanges: Map<number, Record<string, unknown>> // Now keyed by rowid
+  primaryKey: string | null // User-defined primary key column name, or null if no PK
+  dirtyChanges: Map<number, Record<string, unknown>> // Now keyed by __rowid__ (system rowid)
   selectedRowKeys?: React.Key[]
   containerRef?: React.RefObject<HTMLDivElement | null> // Reference to parent container for height calculation
   visibleColumns?: string[] // Array of visible column names
   onCellValueChange: (
-    rowid: number, // Changed from primaryKeyValue to rowid
+    rowid: number, // System rowid value (__rowid__)
     columnName: string,
     newValue: string | number | boolean | null
   ) => void
@@ -394,12 +394,12 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
         ellipsis: true,
         onCell: (record: Record<string, unknown>) => {
           // Determine if this cell is editable
-          // - rowid is never editable (system column)
-          // - all other columns (including primary key) are editable
-          const isEditable = col.column_name !== 'rowid'
+          // - __rowid__ is never editable (system column, but it won't appear in columns list)
+          // - all other columns (including user-defined 'rowid' and primary key) are editable
+          const isEditable = col.column_name !== '__rowid__'
 
-          // Get rowid for this row - now the stable identifier
-          const rowid = record.rowid as number
+          // Get __rowid__ for this row - the stable system rowid identifier
+          const rowid = record.__rowid__ as number
 
           return {
             record,
@@ -409,15 +409,15 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
             dataType: col.data_type,
             isPrimaryKey: col.column_name === primaryKey,
             onSave: (newValue: string | number | boolean | null) => {
-              // Simply pass rowid - no complex logic needed
+              // Simply pass __rowid__ - no complex logic needed
               onCellValueChange(rowid, col.column_name, newValue)
             }
           }
         },
         render: (value: unknown, record: Record<string, unknown>) => {
           // Check if this cell has been modified
-          // Now using rowid - simple and direct
-          const rowid = record.rowid as number
+          // Use __rowid__ (system rowid) for dirty tracking
+          const rowid = record.__rowid__ as number
           const isDirty =
             dirtyChanges.has(rowid) &&
             dirtyChanges.get(rowid)?.[col.column_name] !== undefined
@@ -479,8 +479,8 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
         dataSource={data}
         columns={columns}
         rowKey={record => {
-          // Always use rowid as the stable row identifier
-          return `rowid_${record.rowid}`
+          // Always use __rowid__ (system rowid) as the stable row identifier
+          return `rowid_${record.__rowid__}`
         }}
         pagination={false}
         scroll={{ x: 'max-content', y: tableHeight }}

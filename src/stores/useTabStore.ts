@@ -330,7 +330,7 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       // Find primary key
       const pkColumn = columns.find((col: any) => col.is_primary_key)
-      const primaryKey = pkColumn?.column_name || 'rowid'
+      const primaryKey = pkColumn?.column_name || null
 
       // Build WHERE clause from filter conditions
       const whereClause = buildWhereClause(filterConditions)
@@ -371,15 +371,9 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       const data = dataResults[0]?.rows || []
 
-      // Normalize: rename __rowid__ to rowid for internal use
-      const normalizedData = data.map((row: any) => ({
-        ...row,
-        rowid: row.__rowid__
-      }))
-
       get().updateTableViewTabState(key, {
         isLoading: false,
-        data: normalizedData,
+        data,
         columns,
         primaryKey,
         total: totalCount
@@ -408,9 +402,9 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
           return tab
         }
 
-        // Update the data array - simple rowid matching
+        // Update the data array - use __rowid__ for matching (system rowid)
         const newData = tab.data.map(row => {
-          if (row.rowid === rowid) {
+          if (row.__rowid__ === rowid) {
             return { ...row, [columnName]: newValue }
           }
           return row
