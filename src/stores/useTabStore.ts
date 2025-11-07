@@ -12,6 +12,8 @@ import {
   escapeIdentifier,
   toSqlValue
 } from '../services/api.service'
+import { exportToExcel } from '../utils/excelUtils'
+import type { ExportOptions } from '../components/ExportDialog'
 
 interface TabStoreState {
   tabs: Tab[]
@@ -45,6 +47,8 @@ interface TabStoreState {
   deleteRows: (key: string, rowids: number[]) => Promise<void>
   updateFilterConditions: (key: string, conditions: FilterCondition[]) => void
   changePage: (key: string, page: number, pageSize: number) => void
+  exportTableData: (key: string, options: ExportOptions) => Promise<void>
+  importTableData: (key: string, data: Record<string, any>[]) => Promise<void>
 
   // Table Structure specific
   updateTableStructureTabState: (
@@ -755,6 +759,141 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
         isLoading: false,
         error: error instanceof Error ? error.message : String(error)
       })
+    }
+  },
+
+  /**
+   * Export table data to Excel
+   */
+  exportTableData: async (key: string, options: ExportOptions) => {
+    const state = get()
+    const tab = state.tabs.find(t => t.key === key)
+
+    if (!tab || tab.type !== 'table_view') {
+      throw new Error('Tab not found or not a table view')
+    }
+
+    get().updateTableViewTabState(key, { isLoading: true, error: null })
+
+    try {
+      const { tableName, columns } = tab
+      const { filters, limit } = options
+      const escapedTableName = escapeIdentifier(tableName)
+
+      // Build WHERE clause from filter conditions
+      const whereClause = buildWhereClause(filters)
+
+      // Build column list (exclude __rowid__ from export)
+      const columnList = columns
+        .map(col => escapeIdentifier(col.column_name))
+        .join(', ')
+
+      // Build SQL query with optional limit
+      let sql = `SELECT ${columnList} FROM ${escapedTableName}${whereClause}`
+      if (limit && limit > 0) {
+        sql += ` LIMIT ${limit}`
+      }
+
+      // Execute query
+      const results = await apiService.execute(sql)
+
+      if (results[0]?.error) {
+        get().updateTableViewTabState(key, {
+          isLoading: false,
+          error: results[0].error
+        })
+        throw new Error(results[0].error)
+      }
+
+      const exportData = results[0]?.rows || []
+
+      if (exportData.length === 0) {
+        get().updateTableViewTabState(key, { isLoading: false })
+        throw new Error('No data to export')
+      }
+
+      // Generate filename with timestamp
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, '-')
+        .slice(0, -5)
+      const fileName = `${tableName}_${timestamp}.xlsx`
+
+      // Export to Excel
+      exportToExcel(exportData, columns, fileName)
+
+      get().updateTableViewTabState(key, { isLoading: false })
+    } catch (error) {
+      get().updateTableViewTabState(key, {
+        isLoading: false,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      throw error
+    }
+  },
+
+  /**
+   * Import data from Excel to table
+   */
+  importTableData: async (key: string, data: Record<string, any>[]) => {
+    const state = get()
+    const tab = state.tabs.find(t => t.key === key)
+
+    if (!tab || tab.type !== 'table_view') {
+      throw new Error('Tab not found or not a table view')
+    }
+
+    if (data.length === 0) {
+      throw new Error('No data to import')
+    }
+
+    get().updateTableViewTabState(key, { isLoading: true, error: null })
+
+    try {
+      const { tableName } = tab
+      const escapedTableName = escapeIdentifier(tableName)
+
+      // Build INSERT statements for batch import
+      const insertStatements: string[] = []
+
+      data.forEach(row => {
+        const columns = Object.keys(row).filter(col => row[col] !== undefined)
+        const escapedColumns = columns.map(col => escapeIdentifier(col))
+        const values = columns.map(col => toSqlValue(row[col]))
+
+        const sql = `INSERT INTO ${escapedTableName} (${escapedColumns.join(
+          ', '
+        )}) VALUES (${values.join(', ')})`
+        insertStatements.push(sql)
+      })
+
+      // Execute batch insert (in chunks to avoid too large SQL)
+      const chunkSize = 100
+      for (let i = 0; i < insertStatements.length; i += chunkSize) {
+        const chunk = insertStatements.slice(i, i + chunkSize)
+        const batchSql = chunk.join('; ')
+        const results = await apiService.execute(batchSql)
+
+        // Check for errors
+        const hasErrors = results.some(r => r.error)
+        if (hasErrors) {
+          const firstError = results.find(r => r.error)?.error
+          get().updateTableViewTabState(key, {
+            isLoading: false,
+            error: firstError || 'Failed to import data'
+          })
+          throw new Error(firstError || 'Failed to import data')
+        }
+      }
+
+      // Reload table data
+      await get().loadTableData(key)
+    } catch (error) {
+      get().updateTableViewTabState(key, {
+        isLoading: false,
+        error: error instanceof Error ? error.message : String(error)
+      })
+      throw error
     }
   }
 }))

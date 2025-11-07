@@ -5,14 +5,19 @@ import {
   SaveOutlined,
   PlusOutlined,
   DeleteOutlined,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  ExportOutlined,
+  ImportOutlined
 } from '@ant-design/icons'
 import { useTabStore } from '../stores/useTabStore'
 import { EditableGrid } from './EditableGrid'
 import { AddRowDialog } from './AddRowDialog'
 import { FilterBuilder } from './FilterBuilder'
 import { ColumnSelector } from './ColumnSelector'
+import { ExportDialog } from './ExportDialog'
+import { ImportDialog } from './ImportDialog'
 import type { TableViewTab, FilterCondition } from '../types'
+import type { ExportOptions } from './ExportDialog'
 
 interface TableViewPanelProps {
   tabKey: string
@@ -39,8 +44,12 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
     state => state.updateFilterConditions
   )
   const changePage = useTabStore(state => state.changePage)
+  const exportTableData = useTabStore(state => state.exportTableData)
+  const importTableData = useTabStore(state => state.importTableData)
 
   const [addRowDialogVisible, setAddRowDialogVisible] = useState(false)
+  const [exportDialogVisible, setExportDialogVisible] = useState(false)
+  const [importDialogVisible, setImportDialogVisible] = useState(false)
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [visibleColumns, setVisibleColumns] = useState<string[]>([])
   const tableContainerRef = React.useRef<HTMLDivElement>(null)
@@ -146,6 +155,42 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
     changePage(tabKey, page, pageSize)
   }
 
+  const handleExport = () => {
+    setExportDialogVisible(true)
+  }
+
+  const handleExportConfirm = async (options: ExportOptions) => {
+    try {
+      await exportTableData(tabKey, options)
+      setExportDialogVisible(false)
+      message.success('Data exported successfully')
+    } catch (error) {
+      message.error(
+        `Export failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      )
+    }
+  }
+
+  const handleImport = () => {
+    setImportDialogVisible(true)
+  }
+
+  const handleImportConfirm = async (data: Record<string, any>[]) => {
+    try {
+      await importTableData(tabKey, data)
+      setImportDialogVisible(false)
+      message.success(`Successfully imported ${data.length} rows`)
+    } catch (error) {
+      message.error(
+        `Import failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      )
+    }
+  }
+
   const hasDirtyChanges = tab.dirtyChanges.size > 0
 
   return (
@@ -197,6 +242,20 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
           >
             Delete Selected{' '}
             {selectedRowKeys.length > 0 && `(${selectedRowKeys.length})`}
+          </Button>
+          <Button
+            icon={<ExportOutlined />}
+            onClick={handleExport}
+            disabled={tab.isLoading}
+          >
+            Export
+          </Button>
+          <Button
+            icon={<ImportOutlined />}
+            onClick={handleImport}
+            disabled={tab.isLoading}
+          >
+            Import
           </Button>
           <ColumnSelector
             columns={tab.columns}
@@ -328,6 +387,25 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
         primaryKey={tab.primaryKey}
         onCancel={() => setAddRowDialogVisible(false)}
         onConfirm={handleAddRowConfirm}
+      />
+
+      {/* Export Dialog */}
+      <ExportDialog
+        visible={exportDialogVisible}
+        tableName={tab.tableName}
+        columns={tab.columns}
+        currentFilters={tab.filterConditions}
+        onCancel={() => setExportDialogVisible(false)}
+        onConfirm={handleExportConfirm}
+      />
+
+      {/* Import Dialog */}
+      <ImportDialog
+        visible={importDialogVisible}
+        tableName={tab.tableName}
+        columns={tab.columns}
+        onCancel={() => setImportDialogVisible(false)}
+        onConfirm={handleImportConfirm}
       />
     </div>
   )
