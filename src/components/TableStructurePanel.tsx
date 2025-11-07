@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react'
-import { Button, Space, Alert, Spin, Table, Tag } from 'antd'
+import { Button, Space, Spin, Table, Tag } from 'antd'
 import { ReloadOutlined, SaveOutlined, KeyOutlined } from '@ant-design/icons'
 import { useTabStore } from '../stores/useTabStore'
 import type { TableStructureTab } from '../types'
@@ -135,18 +135,6 @@ export const TableStructurePanel: React.FC<TableStructurePanelProps> = ({
           </Button>
         </Space>
       </div>
-
-      {/* Error Display */}
-      {tab.error && (
-        <Alert
-          message="Error Loading Table Structure"
-          description={tab.error}
-          type="error"
-          showIcon
-          closable
-          style={{ margin: '16px' }}
-        />
-      )}
 
       {/* Structure Grid */}
       <Spin spinning={tab.isLoading}>

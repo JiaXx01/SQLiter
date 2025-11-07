@@ -1,5 +1,5 @@
 import React, { useRef } from 'react'
-import { Button, Tabs, Alert, Spin, Space } from 'antd'
+import { Button, Tabs, Spin, Space } from 'antd'
 import { PlayCircleOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import Editor from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
@@ -208,30 +208,23 @@ export const SqlEditorPanel: React.FC<SqlEditorPanelProps> = ({ tabKey }) => {
     if (tab.results.length === 1) {
       const result = tab.results[0]
 
-      if (result.error) {
-        return (
-          <Alert
-            message="SQL Error"
-            description={result.error}
-            type="error"
-            showIcon
-            style={{ margin: '16px' }}
-          />
-        )
-      }
-
       if (result.rows) {
         return <ResultsGrid data={result.rows} />
       }
 
       return (
-        <Alert
-          message="Query Executed Successfully"
-          description={`Affected rows: ${result.rowCount}`}
-          type="success"
-          showIcon
-          style={{ margin: '16px' }}
-        />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: '#52c41a',
+            fontSize: '16px'
+          }}
+        >
+          ✓ Query executed successfully. Affected rows: {result.rowCount}
+        </div>
       )
     }
 
@@ -239,35 +232,28 @@ export const SqlEditorPanel: React.FC<SqlEditorPanelProps> = ({ tabKey }) => {
     const resultItems = tab.results.map((result, index) => {
       let content
 
-      if (result.error) {
-        content = (
-          <Alert
-            message="SQL Error"
-            description={result.error}
-            type="error"
-            showIcon
-            style={{ margin: '16px' }}
-          />
-        )
-      } else if (result.rows) {
+      if (result.rows) {
         content = <ResultsGrid data={result.rows} />
       } else {
         content = (
-          <Alert
-            message="Query Executed Successfully"
-            description={`Affected rows: ${result.rowCount}`}
-            type="success"
-            showIcon
-            style={{ margin: '16px' }}
-          />
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: '#52c41a',
+              fontSize: '16px'
+            }}
+          >
+            ✓ Query executed successfully. Affected rows: {result.rowCount}
+          </div>
         )
       }
 
       return {
         key: `result-${index}`,
-        label: result.error
-          ? `❌ Result ${index + 1}`
-          : `✓ Result ${index + 1}`,
+        label: `✓ Result ${index + 1}`,
         children: content
       }
     })

@@ -1,10 +1,10 @@
 import { create } from 'zustand'
+import { Modal } from 'antd'
 import type {
   Tab,
   SqlEditorTab,
   TableViewTab,
   TableStructureTab,
-  ApiResult,
   FilterCondition
 } from '../types'
 import {
@@ -258,18 +258,15 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
         results
       })
     } catch (error) {
-      // Handle network error
-      const errorResult: ApiResult = {
-        rows: null,
-        rowCount: 0,
-        error: `Network error: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      }
+      // Show error in modal dialog
+      Modal.error({
+        title: 'SQL Execution Error',
+        content: error instanceof Error ? error.message : String(error),
+        width: 600
+      })
 
       get().updateSqlTabState(key, {
-        isLoading: false,
-        results: [errorResult]
+        isLoading: false
       })
     }
   },
@@ -311,14 +308,6 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       const columnsSql = `PRAGMA table_info('${tableName.replace(/'/g, "''")}')`
       const columnsResults = await apiService.execute(columnsSql)
 
-      if (columnsResults[0]?.error) {
-        get().updateTableViewTabState(key, {
-          isLoading: false,
-          error: columnsResults[0].error
-        })
-        return
-      }
-
       const pragmaColumns = columnsResults[0]?.rows || []
 
       // Convert PRAGMA table_info format to our ColumnInfo format
@@ -343,14 +332,6 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       const countSql = `SELECT COUNT(*) as total FROM ${escapedTableName}${whereClause}`
       const countResults = await apiService.execute(countSql)
 
-      if (countResults[0]?.error) {
-        get().updateTableViewTabState(key, {
-          isLoading: false,
-          error: countResults[0].error
-        })
-        return
-      }
-
       const totalCount = countResults[0]?.rows?.[0]?.total || 0
 
       // Always load rowid for consistent row identification
@@ -365,14 +346,6 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       const dataSql = `SELECT _rowid_ AS __rowid__, ${columnList} FROM ${escapedTableName}${whereClause} LIMIT ${pageSize} OFFSET ${offset}`
       const dataResults = await apiService.execute(dataSql)
 
-      if (dataResults[0]?.error) {
-        get().updateTableViewTabState(key, {
-          isLoading: false,
-          error: dataResults[0].error
-        })
-        return
-      }
-
       const data = dataResults[0]?.rows || []
 
       get().updateTableViewTabState(key, {
@@ -383,9 +356,15 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
         total: totalCount
       })
     } catch (error) {
+      // Show error in modal dialog
+      Modal.error({
+        title: 'Error Loading Table Data',
+        content: error instanceof Error ? error.message : String(error),
+        width: 600
+      })
+
       get().updateTableViewTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+        isLoading: false
       })
     }
   },
@@ -476,18 +455,7 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       // Execute batch update
       const batchSql = updateStatements.join('; ')
-      const results = await apiService.execute(batchSql)
-
-      // Check for errors
-      const hasErrors = results.some(r => r.error)
-      if (hasErrors) {
-        const firstError = results.find(r => r.error)?.error
-        get().updateTableViewTabState(key, {
-          isLoading: false,
-          error: firstError || 'Failed to save changes'
-        })
-        return
-      }
+      await apiService.execute(batchSql)
 
       // Clear dirty changes and reload data
       get().updateTableViewTabState(key, {
@@ -496,10 +464,17 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       await get().loadTableData(key)
     } catch (error) {
-      get().updateTableViewTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+      // Show error in modal dialog
+      Modal.error({
+        title: 'Error Saving Changes',
+        content: error instanceof Error ? error.message : String(error),
+        width: 600
       })
+
+      get().updateTableViewTabState(key, {
+        isLoading: false
+      })
+      throw error
     }
   },
 
@@ -528,22 +503,20 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       const sql = `INSERT INTO ${escapedTableName} (${escapedColumns.join(
         ', '
       )}) VALUES (${values.join(', ')})`
-      const results = await apiService.execute(sql)
-
-      if (results[0]?.error) {
-        get().updateTableViewTabState(key, {
-          isLoading: false,
-          error: results[0].error
-        })
-        throw new Error(results[0].error)
-      }
+      await apiService.execute(sql)
 
       // Reload table data
       await get().loadTableData(key)
     } catch (error) {
+      // Show error in modal dialog
+      Modal.error({
+        title: 'Error Adding Row',
+        content: error instanceof Error ? error.message : String(error),
+        width: 600
+      })
+
       get().updateTableViewTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+        isLoading: false
       })
       throw error
     }
@@ -603,25 +576,20 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       })
 
       const batchSql = deleteStatements.join('; ')
-      const results = await apiService.execute(batchSql)
-
-      // Check for errors
-      const hasErrors = results.some(r => r.error)
-      if (hasErrors) {
-        const firstError = results.find(r => r.error)?.error
-        get().updateTableViewTabState(key, {
-          isLoading: false,
-          error: firstError || 'Failed to delete rows'
-        })
-        throw new Error(firstError || 'Failed to delete rows')
-      }
+      await apiService.execute(batchSql)
 
       // Reload table data
       await get().loadTableData(key)
     } catch (error) {
+      // Show error in modal dialog
+      Modal.error({
+        title: 'Error Deleting Rows',
+        content: error instanceof Error ? error.message : String(error),
+        width: 600
+      })
+
       get().updateTableViewTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+        isLoading: false
       })
       throw error
     }
@@ -662,14 +630,6 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       const sql = `PRAGMA table_info('${tab.tableName.replace(/'/g, "''")}')`
       const results = await apiService.execute(sql)
 
-      if (results[0]?.error) {
-        get().updateTableStructureTabState(key, {
-          isLoading: false,
-          error: results[0].error
-        })
-        return
-      }
-
       // Convert PRAGMA table_info format to our ColumnInfo format
       // PRAGMA returns: { cid, name, type, notnull, dflt_value, pk }
       const pragmaColumns = results[0]?.rows || []
@@ -688,9 +648,15 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
         columns
       })
     } catch (error) {
+      // Show error in modal dialog
+      Modal.error({
+        title: 'Error Loading Table Structure',
+        content: error instanceof Error ? error.message : String(error),
+        width: 600
+      })
+
       get().updateTableStructureTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+        isLoading: false
       })
     }
   },
@@ -735,17 +701,7 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       if (alterStatements.length > 0) {
         const batchSql = alterStatements.join('; ')
-        const results = await apiService.execute(batchSql)
-
-        const hasErrors = results.some(r => r.error)
-        if (hasErrors) {
-          const firstError = results.find(r => r.error)?.error
-          get().updateTableStructureTabState(key, {
-            isLoading: false,
-            error: firstError || 'Failed to save structure changes'
-          })
-          return
-        }
+        await apiService.execute(batchSql)
       }
 
       // Clear changes and reload
@@ -755,9 +711,15 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
 
       await get().loadTableStructure(key)
     } catch (error) {
+      // Show error in modal dialog
+      Modal.error({
+        title: 'Error Saving Structure Changes',
+        content: error instanceof Error ? error.message : String(error),
+        width: 600
+      })
+
       get().updateTableStructureTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+        isLoading: false
       })
     }
   },
@@ -797,14 +759,6 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       // Execute query
       const results = await apiService.execute(sql)
 
-      if (results[0]?.error) {
-        get().updateTableViewTabState(key, {
-          isLoading: false,
-          error: results[0].error
-        })
-        throw new Error(results[0].error)
-      }
-
       const exportData = results[0]?.rows || []
 
       if (exportData.length === 0) {
@@ -825,8 +779,7 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       get().updateTableViewTabState(key, { isLoading: false })
     } catch (error) {
       get().updateTableViewTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+        isLoading: false
       })
       throw error
     }
@@ -872,26 +825,14 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
       for (let i = 0; i < insertStatements.length; i += chunkSize) {
         const chunk = insertStatements.slice(i, i + chunkSize)
         const batchSql = chunk.join('; ')
-        const results = await apiService.execute(batchSql)
-
-        // Check for errors
-        const hasErrors = results.some(r => r.error)
-        if (hasErrors) {
-          const firstError = results.find(r => r.error)?.error
-          get().updateTableViewTabState(key, {
-            isLoading: false,
-            error: firstError || 'Failed to import data'
-          })
-          throw new Error(firstError || 'Failed to import data')
-        }
+        await apiService.execute(batchSql)
       }
 
       // Reload table data
       await get().loadTableData(key)
     } catch (error) {
       get().updateTableViewTabState(key, {
-        isLoading: false,
-        error: error instanceof Error ? error.message : String(error)
+        isLoading: false
       })
       throw error
     }

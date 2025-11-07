@@ -69,6 +69,9 @@ export function toSqlValue(value: any): string {
 /**
  * Main API execute function
  * Sends SQL to backend and receives execution results
+ *
+ * Now throws errors on HTTP failures instead of returning error objects.
+ * Success responses return data, error responses throw exceptions.
  */
 export async function executeSQL(
   request: ExecuteRequest
@@ -77,13 +80,7 @@ export async function executeSQL(
 
   // Validate SQL input
   if (!sql || !sql.trim()) {
-    return [
-      {
-        rows: null,
-        rowCount: 0,
-        error: 'No SQL statement provided'
-      }
-    ]
+    throw new Error('No SQL statement provided')
   }
 
   try {
@@ -96,18 +93,12 @@ export async function executeSQL(
       body: JSON.stringify({ sql })
     })
 
-    // Handle HTTP errors
+    // Handle HTTP errors - backend now returns error status codes for SQL errors
     if (!response.ok) {
       const errorText = await response.text()
-      return [
-        {
-          rows: null,
-          rowCount: 0,
-          error: `HTTP Error ${response.status}: ${
-            errorText || response.statusText
-          }`
-        }
-      ]
+      throw new Error(
+        errorText || `HTTP Error ${response.status}: ${response.statusText}`
+      )
     }
 
     // Parse response as JSON
@@ -152,24 +143,13 @@ export async function executeSQL(
     }
 
     // Unexpected response format
-    return [
-      {
-        rows: null,
-        rowCount: 0,
-        error: 'Unexpected response format from server'
-      }
-    ]
+    throw new Error('Unexpected response format from server')
   } catch (error) {
-    // Handle network errors, JSON parse errors, etc.
-    return [
-      {
-        rows: null,
-        rowCount: 0,
-        error: `Request failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      }
-    ]
+    // Re-throw the error to be handled by the caller
+    if (error instanceof Error) {
+      throw error
+    }
+    throw new Error(`Request failed: ${String(error)}`)
   }
 }
 

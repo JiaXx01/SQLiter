@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Button, Space, Alert, Spin, Pagination, message, Modal } from 'antd'
+import { Button, Space, Spin, Pagination, message, Modal } from 'antd'
 import {
   ReloadOutlined,
   SaveOutlined,
@@ -59,6 +59,7 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
     if (tab && tab.columns.length > 0 && visibleColumns.length === 0) {
       setVisibleColumns(tab.columns.map(col => col.column_name))
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab?.columns])
 
   useEffect(() => {
@@ -279,18 +280,6 @@ export const TableViewPanel: React.FC<TableViewPanelProps> = ({ tabKey }) => {
           overflow: 'hidden'
         }}
       >
-        {/* Error Display */}
-        {tab.error && (
-          <Alert
-            message="Error Loading Table Data"
-            description={tab.error}
-            type="error"
-            showIcon
-            closable
-            style={{ margin: '8px', marginBottom: 0, flexShrink: 0 }}
-          />
-        )}
-
         {/* Filter Builder - Auto height based on content */}
         <div style={{ padding: '8px 12px 0 12px', flexShrink: 0 }}>
           <FilterBuilder
