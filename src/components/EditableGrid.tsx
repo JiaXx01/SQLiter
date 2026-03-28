@@ -3,7 +3,6 @@ import {
   Table,
   Input,
   InputNumber,
-  Form,
   Select,
   DatePicker,
   Modal,
@@ -251,9 +250,7 @@ const EditableCell: React.FC<EditableCellProps> = ({
 
   if (editable) {
     childNode = editing ? (
-      <Form.Item style={{ margin: 0 }} name={dataIndex} initialValue={value}>
-        {getInputComponent()}
-      </Form.Item>
+      getInputComponent()
     ) : (
       <div
         className="editable-cell-value-wrap"
@@ -461,32 +458,30 @@ export const EditableGrid: React.FC<EditableGridProps> = ({
     : undefined
 
   return (
-    <Form component={false}>
-      <Table
-        components={{
-          body: {
-            cell: EditableCell
-          }
-        }}
-        rowSelection={
-          rowSelection
-            ? {
-                type: 'checkbox',
-                ...rowSelection
-              }
-            : undefined
+    <Table
+      components={{
+        body: {
+          cell: EditableCell
         }
-        dataSource={data}
-        columns={columns}
-        rowKey={record => {
-          // Always use __rowid__ (system rowid) as the stable row identifier
-          return `rowid_${record.__rowid__}`
-        }}
-        pagination={false}
-        scroll={{ x: 'max-content', y: tableHeight }}
-        size="small"
-        bordered
-      />
-    </Form>
+      }}
+      rowSelection={
+        rowSelection
+          ? {
+              type: 'checkbox',
+              ...rowSelection
+            }
+          : undefined
+      }
+      dataSource={data}
+      columns={columns}
+      rowKey={record => {
+        // Always use __rowid__ (system rowid) as the stable row identifier
+        return `rowid_${record.__rowid__}`
+      }}
+      pagination={false}
+      scroll={{ x: 'max-content', y: tableHeight }}
+      size="small"
+      bordered
+    />
   )
 }

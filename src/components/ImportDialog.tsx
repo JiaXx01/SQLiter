@@ -34,7 +34,7 @@ interface FieldMapping {
 
 /**
  * ImportDialog Component
- * 
+ *
  * Allows users to import data from Excel files with:
  * - Strict field validation
  * - Column mapping verification
@@ -86,9 +86,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     // Get required table columns (non-nullable, no default, not auto-increment)
     const requiredColumns = columns.filter(
       col =>
-        col.is_nullable === 'NO' &&
-        !col.column_default &&
-        !col.is_primary_key // Assuming PK might be auto-increment
+        col.is_nullable === 'NO' && !col.column_default && !col.is_primary_key // Assuming PK might be auto-increment
     )
 
     // Check each Excel column
@@ -111,7 +109,9 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
           matched: false,
           dataType: ''
         })
-        errors.push(`Excel column "${excelCol}" does not match any table column`)
+        errors.push(
+          `Excel column "${excelCol}" does not match any table column`
+        )
       }
     })
 
@@ -211,7 +211,10 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
           const excelColumns = Object.keys(jsonData[0] as Record<string, any>)
 
           // Validate fields
-          const { mappings, errors } = validateFields(excelColumns, jsonData)
+          const { mappings, errors } = validateFields(
+            excelColumns,
+            jsonData as Record<string, any>[]
+          )
 
           setFieldMappings(mappings)
           setValidationErrors(errors)
@@ -226,8 +229,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
                     mapping.excelColumn
                   ]
                   // Convert empty strings to null
-                  mappedRow[mapping.tableColumn] =
-                    value === '' ? null : value
+                  mappedRow[mapping.tableColumn] = value === '' ? null : value
                 }
               })
               return mappedRow
@@ -355,9 +357,12 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
         {parsedData.length > 0 && validationErrors.length === 0 && (
           <Alert
             message="Data Preview"
-            description={`Ready to import ${parsedData.length} rows. First row: ${JSON.stringify(
-              parsedData[0]
-            ).substring(0, 100)}...`}
+            description={`Ready to import ${
+              parsedData.length
+            } rows. First row: ${JSON.stringify(parsedData[0]).substring(
+              0,
+              100
+            )}...`}
             type="success"
             showIcon
           />
@@ -367,7 +372,10 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
         <div style={{ color: '#666', fontSize: '12px' }}>
           <Text strong>Import Requirements:</Text>
           <ul style={{ marginTop: 8, marginBottom: 0 }}>
-            <li>Excel column names must match table column names (case-insensitive)</li>
+            <li>
+              Excel column names must match table column names
+              (case-insensitive)
+            </li>
             <li>All required (non-nullable) columns must be present</li>
             <li>Data types should match table column types</li>
             <li>Empty cells will be imported as NULL values</li>
@@ -378,4 +386,3 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     </Modal>
   )
 }
-

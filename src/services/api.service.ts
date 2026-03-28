@@ -7,8 +7,17 @@ import type { ApiResult, ExecuteRequest, ExecuteResponse } from '../types'
  * The backend executes SQL statements and returns the results directly.
  */
 
+// Declare custom property on window object
+declare global {
+  interface Window {
+    baseUrl: {
+      value: string
+    }
+  }
+}
+
 // API Configuration
-const API_EXECUTE_ENDPOINT = `https://erp.kutongda.com/_sqlite_gui/api/execute`
+const API_EXECUTE_ENDPOINT = `${window.baseUrl.value}/api/execute`
 
 /**
  * Escapes SQL identifiers (table names, column names) to prevent SQL syntax errors
