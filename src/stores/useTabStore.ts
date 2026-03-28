@@ -5,7 +5,8 @@ import type {
   SqlEditorTab,
   TableViewTab,
   TableStructureTab,
-  FilterCondition
+  FilterCondition,
+  ColumnInfo
 } from '../types'
 import {
   apiService,
@@ -133,6 +134,65 @@ function buildWhereClause(conditions: FilterCondition[]): string {
   })
 
   return ' WHERE ' + clauses.join(' ')
+}
+
+function isNumericType(dataType: string): boolean {
+  const type = dataType.toUpperCase()
+  return (
+    type.includes('INT') ||
+    type.includes('NUMERIC') ||
+    type.includes('REAL') ||
+    type.includes('FLOAT') ||
+    type.includes('DOUBLE') ||
+    type.includes('DECIMAL')
+  )
+}
+
+function isBooleanType(dataType: string): boolean {
+  const type = dataType.toUpperCase()
+  return type === 'BOOLEAN' || type === 'BOOL'
+}
+
+function normalizeBooleanValue(value: any): boolean | null {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  if (typeof value === 'boolean') {
+    return value
+  }
+
+  const normalized = String(value).trim().toLowerCase()
+  if (['true', '1', 'yes', 'y'].includes(normalized)) {
+    return true
+  }
+  if (['false', '0', 'no', 'n'].includes(normalized)) {
+    return false
+  }
+
+  throw new Error(`Invalid boolean value "${value}"`)
+}
+
+function normalizeImportValue(value: any, column: ColumnInfo): any {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  if (isNumericType(column.data_type)) {
+    const numericValue = Number(value)
+    if (Number.isNaN(numericValue)) {
+      throw new Error(
+        `Column "${column.column_name}" expects numeric value, got "${value}"`
+      )
+    }
+    return numericValue
+  }
+
+  if (isBooleanType(column.data_type)) {
+    return normalizeBooleanValue(value)
+  }
+
+  return value
 }
 
 export const useTabStore = create<TabStoreState>((set, get) => ({
@@ -803,16 +863,41 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
     get().updateTableViewTabState(key, { isLoading: true, error: null })
 
     try {
-      const { tableName } = tab
+      const { tableName, columns: tableColumns } = tab
       const escapedTableName = escapeIdentifier(tableName)
+      const columnMap = new Map(
+        tableColumns.map(col => [col.column_name.toLowerCase(), col])
+      )
 
       // Build INSERT statements for batch import
       const insertStatements: string[] = []
 
-      data.forEach(row => {
-        const columns = Object.keys(row).filter(col => row[col] !== undefined)
-        const escapedColumns = columns.map(col => escapeIdentifier(col))
-        const values = columns.map(col => toSqlValue(row[col]))
+      data.forEach((row, rowIndex) => {
+        const rowColumns = Object.keys(row).filter(col => row[col] !== undefined)
+        const normalizedEntries: Array<[string, any]> = rowColumns.map(col => {
+          const columnInfo = columnMap.get(col.toLowerCase())
+          if (!columnInfo) {
+            throw new Error(
+              `Unknown column "${col}" at import row ${rowIndex + 1}`
+            )
+          }
+
+          const normalizedValue = normalizeImportValue(row[col], columnInfo)
+          return [columnInfo.column_name, normalizedValue]
+        })
+
+        const insertableEntries = normalizedEntries.filter(
+          entry => entry[1] !== undefined
+        )
+
+        if (insertableEntries.length === 0) {
+          throw new Error(`Import row ${rowIndex + 1} has no valid columns`)
+        }
+
+        const escapedColumns = insertableEntries.map(([colName]) =>
+          escapeIdentifier(colName)
+        )
+        const values = insertableEntries.map(([, value]) => toSqlValue(value))
 
         const sql = `INSERT INTO ${escapedTableName} (${escapedColumns.join(
           ', '
@@ -820,12 +905,24 @@ export const useTabStore = create<TabStoreState>((set, get) => ({
         insertStatements.push(sql)
       })
 
-      // Execute batch insert (in chunks to avoid too large SQL)
+      // Execute batch insert in transactions (in chunks to avoid huge SQL payloads)
       const chunkSize = 100
       for (let i = 0; i < insertStatements.length; i += chunkSize) {
         const chunk = insertStatements.slice(i, i + chunkSize)
-        const batchSql = chunk.join('; ')
-        await apiService.execute(batchSql)
+        const transactionSql = ['BEGIN TRANSACTION', ...chunk, 'COMMIT'].join(
+          '; '
+        )
+
+        try {
+          await apiService.execute(transactionSql)
+        } catch (error) {
+          try {
+            await apiService.execute('ROLLBACK')
+          } catch {
+            // Ignore rollback errors; original import error is more useful
+          }
+          throw error
+        }
       }
 
       // Reload table data

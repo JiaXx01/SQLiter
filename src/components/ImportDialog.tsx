@@ -5,12 +5,13 @@ import {
   Alert,
   Table,
   Space,
+  Button,
   message,
   Typography,
   Tag
 } from 'antd'
-import { InboxOutlined } from '@ant-design/icons'
-import type { UploadFile } from 'antd'
+import { InboxOutlined, DownloadOutlined } from '@ant-design/icons'
+import type { UploadFile, UploadProps } from 'antd'
 import type { ColumnInfo } from '../types'
 import * as XLSX from 'xlsx'
 
@@ -22,7 +23,7 @@ interface ImportDialogProps {
   tableName: string
   columns: ColumnInfo[]
   onCancel: () => void
-  onConfirm: (data: Record<string, any>[]) => void
+  onConfirm: (data: Record<string, any>[]) => Promise<void>
 }
 
 interface FieldMapping {
@@ -52,6 +53,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
   const [parsedData, setParsedData] = useState<Record<string, any>[]>([])
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([])
   const [validationErrors, setValidationErrors] = useState<string[]>([])
+  const [confirming, setConfirming] = useState(false)
 
   const handleCancel = () => {
     setFileList([])
@@ -61,7 +63,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
     onCancel()
   }
 
-  const handleOk = () => {
+  const handleOk = async () => {
     if (validationErrors.length > 0) {
       message.error('Please fix validation errors before importing')
       return
@@ -72,8 +74,30 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
       return
     }
 
-    onConfirm(parsedData)
-    handleCancel()
+    try {
+      setConfirming(true)
+      await onConfirm(parsedData)
+      handleCancel()
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  const isNumericType = (dataType: string): boolean => {
+    const upperDataType = dataType.toUpperCase()
+    return (
+      upperDataType.includes('INT') ||
+      upperDataType.includes('NUMERIC') ||
+      upperDataType.includes('REAL') ||
+      upperDataType.includes('FLOAT') ||
+      upperDataType.includes('DOUBLE') ||
+      upperDataType.includes('DECIMAL')
+    )
+  }
+
+  const isBooleanType = (dataType: string): boolean => {
+    const upperDataType = dataType.toUpperCase()
+    return upperDataType === 'BOOLEAN' || upperDataType === 'BOOL'
   }
 
   const validateFields = (
@@ -146,45 +170,80 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
       )
     }
 
-    // Validate data types (basic validation)
+    // Validate data types with first 20 rows for better early feedback
     if (data.length > 0) {
+      const sampleRows = data.slice(0, 20)
       mappings.forEach(mapping => {
         if (mapping.matched) {
-          const sampleValue = data[0][mapping.excelColumn]
-          const dataType = mapping.dataType.toUpperCase()
-
-          // Basic type checking
-          if (
-            sampleValue !== null &&
-            sampleValue !== undefined &&
-            sampleValue !== ''
-          ) {
+          sampleRows.forEach((row, index) => {
+            const sampleValue = row[mapping.excelColumn]
             if (
-              (dataType.includes('INT') || dataType.includes('NUMERIC')) &&
-              isNaN(Number(sampleValue))
+              sampleValue === null ||
+              sampleValue === undefined ||
+              sampleValue === ''
+            ) {
+              return
+            }
+
+            if (
+              isNumericType(mapping.dataType) &&
+              Number.isNaN(Number(sampleValue))
             ) {
               errors.push(
-                `Column "${mapping.excelColumn}" expects numeric values but contains non-numeric data`
+                `Column "${mapping.excelColumn}" expects numeric values, row ${
+                  index + 1
+                } has "${sampleValue}"`
               )
             }
-          }
+
+            if (
+              isBooleanType(mapping.dataType) &&
+              !['true', 'false', '1', '0'].includes(
+                String(sampleValue).trim().toLowerCase()
+              )
+            ) {
+              errors.push(
+                `Column "${mapping.excelColumn}" expects boolean values, row ${
+                  index + 1
+                } has "${sampleValue}"`
+              )
+            }
+          })
         }
       })
+
+      // De-duplicate possible repeated errors for readability
+      if (errors.length > 0) {
+        const uniqueErrors = Array.from(new Set(errors))
+        return { mappings, errors: uniqueErrors }
+      }
     }
 
     return { mappings, errors }
   }
 
-  const handleFileChange = (info: any) => {
+  const handleFileChange: UploadProps['onChange'] = info => {
     let newFileList = [...info.fileList]
 
     // Only keep the latest file
     newFileList = newFileList.slice(-1)
 
     setFileList(newFileList)
+    setParsedData([])
+    setFieldMappings([])
+    setValidationErrors([])
+
+    if (info.file.status === 'removed') {
+      return
+    }
 
     if (info.file.status === 'done' || info.file.originFileObj) {
-      const file = info.file.originFileObj || info.file
+      const file = info.file.originFileObj
+
+      if (!file) {
+        message.error('Unable to read uploaded file')
+        return
+      }
 
       const reader = new FileReader()
       reader.onload = (e: ProgressEvent<FileReader>) => {
@@ -244,6 +303,9 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
             message.error('Field validation failed')
           }
         } catch (error) {
+          setParsedData([])
+          setFieldMappings([])
+          setValidationErrors([])
           message.error(
             `Failed to parse Excel file: ${
               error instanceof Error ? error.message : String(error)
@@ -254,6 +316,77 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
 
       reader.readAsBinaryString(file)
     }
+  }
+
+  const handleDownloadTemplate = () => {
+    // Auto-increment primary keys are usually omitted during import
+    const templateColumns = columns.filter(
+      col => !(col.is_primary_key && col.data_type.toLowerCase() === 'integer')
+    )
+
+    if (templateColumns.length === 0) {
+      message.warning('No available columns to generate import template')
+      return
+    }
+
+    const getExampleValue = (dataType: string): string => {
+      const type = dataType.toLowerCase()
+      if (
+        type.includes('int') ||
+        type.includes('numeric') ||
+        type.includes('real') ||
+        type.includes('float') ||
+        type.includes('double') ||
+        type.includes('decimal')
+      ) {
+        return '123'
+      }
+      if (type === 'boolean' || type === 'bool') {
+        return 'true'
+      }
+      if (type.includes('date') || type.includes('time')) {
+        return '2026-01-01'
+      }
+      return 'example text'
+    }
+
+    const descriptionRow = templateColumns.reduce<Record<string, string>>(
+      (acc, col) => {
+        const required =
+          col.is_nullable === 'NO' && !col.column_default ? 'required' : 'optional'
+        acc[col.column_name] = `${col.data_type} | ${required}`
+        return acc
+      },
+      {}
+    )
+    const exampleRow = templateColumns.reduce<Record<string, string>>(
+      (acc, col) => {
+        acc[col.column_name] = getExampleValue(col.data_type)
+        return acc
+      },
+      {}
+    )
+    const templateRow = templateColumns.reduce<Record<string, string>>(
+      (acc, col) => {
+        acc[col.column_name] = ''
+        return acc
+      },
+      {}
+    )
+
+    const worksheet = XLSX.utils.json_to_sheet([
+      descriptionRow,
+      exampleRow,
+      templateRow
+    ])
+    worksheet['!cols'] = templateColumns.map(col => ({
+      wch: Math.max(col.column_name.length, 15)
+    }))
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template')
+    XLSX.writeFile(workbook, `${tableName}_import_template.xlsx`)
+    message.success('Import template downloaded (with type and example rows)')
   }
 
   const mappingColumns = [
@@ -296,11 +429,19 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({
       width={900}
       okText="Import"
       cancelText="Cancel"
+      confirmLoading={confirming}
       okButtonProps={{
-        disabled: validationErrors.length > 0 || parsedData.length === 0
+        disabled:
+          confirming || validationErrors.length > 0 || parsedData.length === 0
       }}
     >
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div>
+          <Button icon={<DownloadOutlined />} onClick={handleDownloadTemplate}>
+            Download Import Template
+          </Button>
+        </div>
+
         {/* File Upload */}
         <Dragger
           fileList={fileList}
